@@ -47,6 +47,9 @@ export class HyperGuestConnector extends BaseConnector {
     return pricing;
   }
 
+  /** Max nights per HyperGuest search (API validation limit) */
+  static MAX_NIGHTS_PER_REQUEST = 30;
+
   async fetchInventory({ checkIn, checkOut, location } = {}) {
     if (!cfg?.authToken) {
       console.warn('[HyperGuest] Auth token not configured');
@@ -54,25 +57,43 @@ export class HyperGuestConnector extends BaseConnector {
     }
     const start = checkIn || new Date().toISOString().slice(0, 10);
     const end = checkOut || start;
-    const nights = Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000));
+    const totalNights = Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000));
 
-    const data = await hyperguestService.search({
-      checkIn: start,
-      nights,
-      guests: 1,
-      hotelIds: cfg.testPropertyId || '19912',
-    });
+    const chunkSize = HyperGuestConnector.MAX_NIGHTS_PER_REQUEST;
+    const mergedByExternalId = new Map();
 
-    const results = data?.results || [];
-    const items = [];
-    for (const r of results) {
-      const room = r.rooms?.[0];
-      const ratePlan = room?.ratePlans?.[0];
-      const prices = ratePlan?.prices;
-      const netRate = prices?.net?.price ?? prices?.bar?.price ?? 0;
-      const pricing = this.buildPricingFromTotal(start, nights, netRate);
-      items.push(this.normalizeVilla(r, netRate, pricing));
+    for (let offset = 0; offset < totalNights; offset += chunkSize) {
+      const chunkNights = Math.min(chunkSize, totalNights - offset);
+      const chunkStart = new Date(start);
+      chunkStart.setDate(chunkStart.getDate() + offset);
+      const chunkStartStr = chunkStart.toISOString().slice(0, 10);
+
+      const data = await hyperguestService.search({
+        checkIn: chunkStartStr,
+        nights: chunkNights,
+        guests: 1,
+        hotelIds: cfg.testPropertyId || '19912',
+      });
+
+      const results = data?.results || [];
+      for (const r of results) {
+        const room = r.rooms?.[0];
+        const ratePlan = room?.ratePlans?.[0];
+        const prices = ratePlan?.prices;
+        const netRate = prices?.net?.price ?? prices?.bar?.price ?? 0;
+        const pricing = this.buildPricingFromTotal(chunkStartStr, chunkNights, netRate);
+        const normalized = this.normalizeVilla(r, netRate, pricing);
+        const extId = normalized.externalId;
+
+        if (mergedByExternalId.has(extId)) {
+          const existing = mergedByExternalId.get(extId);
+          existing.rawData.pricing = { ...existing.rawData.pricing, ...pricing };
+        } else {
+          mergedByExternalId.set(extId, normalized);
+        }
+      }
     }
-    return items;
+
+    return Array.from(mergedByExternalId.values());
   }
 }
