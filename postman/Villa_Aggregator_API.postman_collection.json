@@ -1,0 +1,480 @@
+{
+  "info": {
+    "name": "Villa Aggregator API",
+    "description": "Backend API for Villa Aggregator MVP",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8500" },
+    { "key": "api_prefix", "value": "/api/v1" },
+    { "key": "auth_token", "value": "" },
+    { "key": "booking_id", "value": "" },
+    { "key": "villa_id", "value": "" },
+    { "key": "guest_id", "value": "" },
+    { "key": "order_id", "value": "" },
+    { "key": "payment_id", "value": "" }
+  ],
+  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{auth_token}}" }] },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"yourpassword\",\n  \"full_name\": \"Test User\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/auth/signup"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.access_token) {",
+                  "    pm.collectionVariables.set('auth_token', json.access_token);",
+                  "    if (pm.environment) pm.environment.set('auth_token', json.access_token);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"yourpassword\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/auth/login"
+          }
+        },
+        {
+          "name": "Me (Current User)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{auth_token}}"}],
+            "url": "{{base_url}}{{api_prefix}}/auth/me"
+          }
+        },
+        {
+          "name": "Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/auth/forgot-password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Guests",
+      "item": [
+        {
+          "name": "Create Guest",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"+919876543210\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/guests"
+          }
+        },
+        {
+          "name": "Get My Guest",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{auth_token}}"}],
+            "url": "{{base_url}}{{api_prefix}}/guests/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Villas",
+      "item": [
+        {
+          "name": "List Villas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/villas?location=&guests=",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["villas"],
+              "query": [
+                {"key": "location", "value": ""},
+                {"key": "guests", "value": ""}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Villa by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/villas/{{villa_id}}"
+          }
+        },
+        {
+          "name": "Get Villa by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/villas/by-slug/:slug"
+          }
+        },
+        {
+          "name": "Update Villa (Admin)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Villa Name\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/villas/{{villa_id}}"
+          }
+        },
+        {
+          "name": "Lock Villa Fields (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fields\": [\"description\", \"images\"]\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/villas/{{villa_id}}/lock"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "item": [
+        {
+          "name": "Search Villas",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"checkIn\": \"2026-03-06\",\n  \"checkOut\": \"2026-03-08\",\n  \"guests\": 2,\n  \"location\": \"\",\n  \"minPrice\": null,\n  \"maxPrice\": null,\n  \"amenities\": []\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/search"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) {",
+                  "    pm.collectionVariables.set('booking_id', json.id);",
+                  "    if (pm.environment) pm.environment.set('booking_id', json.id);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"villaId\": \"{{villa_id}}\",\n  \"checkIn\": \"2026-03-06\",\n  \"checkOut\": \"2026-03-08\",\n  \"guests\": 2,\n  \"guestId\": \"{{guest_id}}\",\n  \"source\": \"web\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/bookings"
+          }
+        },
+        {
+          "name": "Create Booking (with guest inline)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"villaId\": \"{{villa_id}}\",\n  \"checkIn\": \"2026-03-06\",\n  \"checkOut\": \"2026-03-08\",\n  \"guests\": 2,\n  \"guest\": {\n    \"name\": \"Test User\",\n    \"email\": \"test@example.com\",\n    \"phone\": \"+919876543210\"\n  }\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/bookings"
+          }
+        },
+        {
+          "name": "Get Booking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/bookings/{{booking_id}}"
+          }
+        },
+        {
+          "name": "Create Razorpay Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.orderId) { pm.collectionVariables.set('order_id', json.orderId); }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/bookings/{{booking_id}}/create-order",
+            "description": "Creates order with payment_capture=0 (card auth). Returns orderId, amount, keyId for Razorpay Checkout. Card: authorized first; UPI: auto-captured."
+          }
+        },
+        {
+          "name": "Verify Payment",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{order_id}}\",\n  \"paymentId\": \"{{payment_id}}\",\n  \"signature\": \"razorpay_signature_from_checkout\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/bookings/{{booking_id}}/verify-payment",
+            "description": "After Razorpay Checkout success. Verifies signature, stores payment_method/payment_status, confirms with HyperGuest. Card: captures on success; on platform failure does not capture (auth expires). UPI: refunds on platform failure."
+          }
+        },
+        {
+          "name": "Update Booking Status",
+          "request": {
+            "method": "PATCH",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"cancelled\",\n  \"cancellationReason\": \"Customer request\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/bookings/{{booking_id}}/status",
+            "description": "status: cancelled|refunded. User cancellation: captures authorized card payment (no refund). Cancels HyperGuest if partner_reservation_id set."
+          }
+        },
+        {
+          "name": "Admin Refund (Razorpay)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{auth_token}}"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Admin refund - customer request\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/bookings/{{booking_id}}/refund",
+            "description": "Admin only. Refunds via Razorpay. Works on captured payments (paid/confirmed). Card authorized: cannot refund (let auth expire). Optional: amountPaise for partial refund."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pricing",
+      "item": [
+        {
+          "name": "Get Villa Pricing",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/pricing/{{villa_id}}?checkIn=2026-03-06&checkOut=2026-03-08",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["pricing", "{{villa_id}}"],
+              "query": [
+                {"key": "checkIn", "value": "2026-03-06"},
+                {"key": "checkOut", "value": "2026-03-08"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Flagged Pricing (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{auth_token}}"}],
+            "url": "{{base_url}}{{api_prefix}}/pricing/admin/flags"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Partners",
+      "item": [
+        {
+          "name": "List Partners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/partners"
+          }
+        },
+        {
+          "name": "Get Partner",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/partners/:id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Margin Monitor",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{auth_token}}"}],
+            "url": "{{base_url}}{{api_prefix}}/admin/margin-monitor"
+          }
+        }
+      ]
+    },
+    {
+      "name": "HyperGuest",
+      "item": [
+        {
+          "name": "Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/hyperguest/search?checkIn=2026-03-06&nights=2&guests=2",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["hyperguest", "search"],
+              "query": [
+                {"key": "checkIn", "value": "2026-03-06"},
+                {"key": "nights", "value": "2"},
+                {"key": "guests", "value": "2"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Direct Book",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dates\": {\"from\": \"2026-03-06\", \"to\": \"2026-03-08\"},\n  \"propertyId\": 19912,\n  \"leadGuest\": {\n    \"birthDate\": \"1991-01-01\",\n    \"contact\": {\n      \"address\": \"N/A\",\n      \"city\": \"N/A\",\n      \"country\": \"IN\",\n      \"email\": \"test@example.com\",\n      \"phone\": \"+919876543210\",\n      \"state\": \"N/A\",\n      \"zip\": \"N/A\"\n    },\n    \"name\": {\"first\": \"Test\", \"last\": \"User\"},\n    \"title\": \"MR\"\n  },\n  \"reference\": {\"agency\": \"myref-1234\"},\n  \"paymentDetails\": {\"type\": \"external\"},\n  \"rooms\": [{\n    \"roomCode\": \"SGL\",\n    \"rateCode\": \"BAR\",\n    \"expectedPrice\": {\"amount\": 100, \"currency\": \"INR\"},\n    \"guests\": [{\n      \"birthDate\": \"1991-01-01\",\n      \"name\": {\"first\": \"Test\", \"last\": \"User\"},\n      \"title\": \"MR\"\n    }]\n  }],\n  \"isTest\": false,\n  \"groupBooking\": false\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/hyperguest/book"
+          }
+        },  
+        {
+          "name": "Get Booking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}{{api_prefix}}/hyperguest/booking/:bookingId"
+          }
+        },
+        {
+          "name": "List Bookings",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"agencyReference\": \"\",\n  \"dates\": {\"startDate\": \"2026-03-01\", \"endDate\": \"2026-03-31\"}\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/hyperguest/booking/list"
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Customer cancellation\"\n}"
+            },
+            "url": "{{base_url}}{{api_prefix}}/hyperguest/booking/:bookingId/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "WhatsApp",
+      "item": [
+        {
+          "name": "Verify Webhook (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}{{api_prefix}}/whatsapp?hub.mode=subscribe&hub.verify_token=YOUR_TOKEN&hub.challenge=test",
+              "host": ["{{base_url}}{{api_prefix}}"],
+              "path": ["whatsapp"],
+              "query": [
+                {"key": "hub.mode", "value": "subscribe"},
+                {"key": "hub.verify_token", "value": "YOUR_TOKEN"},
+                {"key": "hub.challenge", "value": "test"}
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

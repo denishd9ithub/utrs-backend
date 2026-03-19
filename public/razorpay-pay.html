@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Razorpay Payment</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    body { font-family: system-ui; margin: 1rem; max-width: 560px; }
+    #msg { margin: 1rem 0; padding: 0.75rem; border-radius: 4px; }
+    #msg.loading { background: #e3f2fd; }
+    #msg.success { background: #e8f5e9; color: #2e7d32; }
+    #msg.err { background: #ffebee; color: #c62828; }
+    pre { background: #f5f5f5; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <h2>Razorpay Payment (Popup)</h2>
+  <div id="msg">Loading...</div>
+  <pre id="out"></pre>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const bookingId = params.get('booking_id');
+
+    if (!bookingId) {
+      document.getElementById('msg').textContent = 'Missing booking_id in URL';
+      document.getElementById('msg').className = 'err';
+      throw new Error('No booking_id');
+    }
+
+    (async function () {
+      const msg = document.getElementById('msg');
+      const out = document.getElementById('out');
+
+      try {
+        const res = await fetch(window.location.origin + '/api/v1/bookings/' + encodeURIComponent(bookingId) + '/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error || res.statusText || 'Create order failed');
+        }
+
+        const { orderId, amount, currency, keyId } = await res.json();
+        msg.textContent = 'Opening Razorpay...';
+        msg.className = 'loading';
+
+        const options = {
+          key: keyId,
+          amount,
+          currency,
+          order_id: orderId,
+          handler: function (response) {
+            const json = {
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature
+            };
+            msg.textContent = 'Payment successful! Copy the JSON below for Postman verify-payment:';
+            msg.className = 'success';
+            out.textContent = JSON.stringify(json, null, 2);
+            try {
+              localStorage.setItem('razorpay_verify_json', JSON.stringify(json));
+              if (window.opener) {
+                window.opener.postMessage({ type: 'razorpay_success', ...json }, window.location.origin);
+              }
+            } catch (_) {}
+          },
+          modal: { ondismiss: function () { msg.textContent = 'Payment cancelled.'; msg.className = 'err'; } }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        msg.textContent = 'Error: ' + err.message;
+        msg.className = 'err';
+      }
+    })();
+  </script>
+</body>
+</html>

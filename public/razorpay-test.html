@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Razorpay Payment Test</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 2rem auto; padding: 0 1rem; }
+    input, button { padding: 0.5rem 1rem; margin: 0.25rem 0; font-size: 1rem; }
+    button { background: #3395ff; color: white; border: none; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #2580e8; }
+    button:disabled { background: #999; cursor: not-allowed; }
+    #out { background: #f5f5f5; padding: 1rem; border-radius: 4px; margin-top: 1rem; white-space: pre-wrap; font-size: 0.9rem; }
+    .copy { margin-left: 0.5rem; font-size: 0.85rem; }
+    .hint { color: #666; font-size: 0.9rem; margin-top: 0.5rem; }
+    #status { margin-top: 0.5rem; padding: 0.5rem; border-radius: 4px; font-size: 0.9rem; }
+    #status.loading { background: #e3f2fd; }
+    #status.err { background: #ffebee; color: #c62828; }
+  </style>
+</head>
+<body>
+  <h1>Razorpay Verify Payment Test</h1>
+  <p>Payment opens on <strong>this page</strong> (no popup). After payment, JSON appears below and is saved to localStorage.</p>
+
+  <div>
+    <label>Booking ID (from Create Booking or Postman):</label><br>
+    <input type="text" id="bookingId" placeholder="e.g. abc12345-1234-..." style="width: 100%;">
+  </div>
+
+  <div style="margin-top: 1rem;">
+    <button id="payBtn" type="button">Pay (Opens on This Page)</button>
+  </div>
+
+  <p class="hint">Test card: 4111 1111 1111 1111 | Expiry: 12/30 | CVV: 123</p>
+
+  <div id="status"></div>
+  <div id="result" style="margin-top: 1rem;"></div>
+  <pre id="out"></pre>
+  <button id="copyBtn" type="button" class="copy" style="display:none; margin-top: 0.5rem;">Copy JSON</button>
+
+  <script>
+    function getBookingId() {
+      const fromUrl = new URLSearchParams(window.location.search).get('booking_id');
+      return fromUrl || document.getElementById('bookingId').value.trim();
+    }
+
+    function setStatus(msg, isErr) {
+      const el = document.getElementById('status');
+      if (el) {
+        el.textContent = msg;
+        el.className = isErr ? 'err' : 'loading';
+        if (!msg) el.className = '';
+      }
+    }
+
+    function showResult(json) {
+      const out = document.getElementById('out');
+      const result = document.getElementById('result');
+      const copyBtn = document.getElementById('copyBtn');
+      if (out && json) {
+        const jsonStr = JSON.stringify(json, null, 2);
+        out.textContent = 'Copy to Postman verify-payment body:\n\n' + jsonStr;
+        out.dataset.json = jsonStr;
+        result.innerHTML = '<strong style="color:green;">Payment successful!</strong> JSON below. Saved to localStorage as <code>razorpay_verify_json</code>.';
+        if (copyBtn) copyBtn.style.display = 'inline-block';
+
+        try {
+          localStorage.setItem('razorpay_verify_json', jsonStr);
+        } catch (_) {}
+      }
+    }
+
+    async function pay() {
+      const bookingId = getBookingId();
+      if (!bookingId) {
+        alert('Enter Booking ID first (or add ?booking_id=xxx in URL)');
+        return;
+      }
+
+      const payBtn = document.getElementById('payBtn');
+      payBtn.disabled = true;
+      setStatus('Creating order...');
+
+      try {
+        const res = await fetch(window.location.origin + '/api/v1/bookings/' + encodeURIComponent(bookingId) + '/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error || res.statusText || 'Create order failed');
+        }
+
+        const { orderId, amount, currency, keyId } = await res.json();
+        setStatus('Opening Razorpay...');
+
+        const options = {
+          key: keyId,
+          amount,
+          currency,
+          order_id: orderId,
+          handler: function (response) {
+            setStatus('');
+            const json = {
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature
+            };
+            showResult(json);
+          },
+          modal: {
+            ondismiss: function () {
+              setStatus('Payment cancelled.', true);
+              payBtn.disabled = false;
+            }
+          }
+        };
+
+        const rzp = new Razorpay(options);
+        rzp.open();
+        payBtn.disabled = false;
+      } catch (err) {
+        setStatus('Error: ' + err.message, true);
+        payBtn.disabled = false;
+      }
+    }
+
+    const urlBookingId = new URLSearchParams(window.location.search).get('booking_id');
+    if (urlBookingId) {
+      document.getElementById('bookingId').value = urlBookingId;
+    }
+
+    document.getElementById('payBtn').addEventListener('click', pay);
+
+    document.getElementById('copyBtn').addEventListener('click', function () {
+      const json = document.getElementById('out').dataset.json;
+      const btn = document.getElementById('copyBtn');
+      if (json && btn) {
+        navigator.clipboard.writeText(json).then(function () {
+          btn.textContent = 'Copied!';
+          setTimeout(function () { btn.textContent = 'Copy JSON'; }, 2000);
+        });
+      }
+    });
+
+    window.addEventListener('focus', function () {
+      try {
+        const saved = localStorage.getItem('razorpay_verify_json');
+        if (saved) {
+          const json = JSON.parse(saved);
+          showResult(json);
+        }
+      } catch (_) {}
+    });
+  </script>
+</body>
+</html>
